@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from enum import IntEnum
-from typing import TypeAlias
+from typing import TypeAlias, Iterator
 
 
 class Cell(IntEnum):
@@ -42,10 +44,11 @@ def set_cell(grid: Grid, pos: Position, state: Cell) -> None:
 
 def get_neighbors(grid: Grid, pos: Position) -> list[Position]:
     r, c = pos
+    n = len(grid)
     return [
         (r + dr, c + dc)
         for dr, dc in _DIRECTIONS
-        if in_bounds(grid, (r + dr, c + dc))
+        if 0 <= r + dr < n and 0 <= c + dc < n
     ]
 
 
@@ -59,3 +62,9 @@ def find_position(grid: Grid, target: Cell) -> Position | None:
             if cell == target:
                 return r, c
     return None
+
+
+def iter_positions(grid: Grid) -> Iterator[tuple[Position, Cell]]:
+    for r, row in enumerate(grid):
+        for c, cell in enumerate(row):
+            yield (r, c), cell
