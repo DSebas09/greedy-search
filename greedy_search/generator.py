@@ -1,12 +1,15 @@
 # generator.py
+from __future__ import annotations
+
 import random
 from collections import deque
+
 from greedy_search.grid import (
     Cell, Grid, Position,
     create_grid, set_cell, get_cell,
     get_neighbors, is_passable, find_position,
+    iter_positions,
 )
-
 
 # --- Constants ---
 GRID_SIZE: int = 20
@@ -15,14 +18,30 @@ FIRE_SOURCES: int = 3
 MIN_DISTANCE: int = 8
 
 
-def _place_randomly(grid: Grid, state: Cell, exclude: set[Position]) -> Position:
-    """Places a cell state in a random EMPTY position not in exclude."""
-    size = len(grid)
-    while True:
-        pos = (random.randint(0, size - 1), random.randint(0, size - 1))
-        if pos not in exclude and get_cell(grid, pos) == Cell.EMPTY:
-            set_cell(grid, pos, state)
-            return pos
+def _manhattan(a: Position, b: Position) -> int:
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
+def _empty_positions(grid: Grid) -> list[Position]:
+    return [pos for pos, cell in iter_positions(grid) if cell == Cell.EMPTY]
+
+
+def _place_far_from(
+    grid: Grid,
+    state: Cell,
+    origin: Position,
+    min_dist: int,
+    exclude: set[Position],
+) -> Position | None:
+    candidates = [
+        pos for pos in _empty_positions(grid)
+        if pos not in exclude and _manhattan(origin, pos) >= min_dist
+    ]
+    if not candidates:
+        return None
+    pos = random.choice(candidates)
+    set_cell(grid, pos, state)
+    return pos
 
 
 def _is_solvable(grid: Grid) -> bool:
@@ -47,47 +66,41 @@ def _is_solvable(grid: Grid) -> bool:
     return False
 
 
-def _manhattan(a: Position, b: Position) -> int:
-    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+def _try_build_level(rng_seed: int) -> Grid | None:
+    random.seed(rng_seed)
+    grid = create_grid(GRID_SIZE)
+
+    for pos, _ in iter_positions(grid):
+        if random.random() < WALL_DENSITY:
+            set_cell(grid, pos, Cell.WALL)
+
+    occupied: set[Position] = set()
+
+    agent_pos = _place_far_from(grid, Cell.AGENT, (0, 0), 0, occupied)
+    if agent_pos is None:
+        return None
+    occupied.add(agent_pos)
+
+    exit_pos = _place_far_from(grid, Cell.EXIT, agent_pos, MIN_DISTANCE, occupied)
+    if exit_pos is None:
+        return None
+    occupied.add(exit_pos)
+
+    for _ in range(FIRE_SOURCES):
+        fire_pos = _place_far_from(grid, Cell.FIRE, agent_pos, MIN_DISTANCE // 2, occupied)
+        if fire_pos is None:
+            return None
+        occupied.add(fire_pos)
+
+    return grid
 
 
 def generate_level(seed: int | None = None) -> tuple[Grid, int]:
     """Generates and validates a level. Returns (grid, seed)."""
-    used_seed = seed if seed is not None else random.randint(0, 999_999)
+    current_seed = seed if seed is not None else random.randint(0, 999_999)
 
     while True:
-        random.seed(used_seed)
-        grid = create_grid(GRID_SIZE)
-
-        # Place walls
-        for r in range(GRID_SIZE):
-            for c in range(GRID_SIZE):
-                if random.random() < WALL_DENSITY:
-                    set_cell(grid, (r, c), Cell.WALL)
-
-        # Place agent and exit with minimum distance
-        occupied: set[Position] = set()
-        agent_pos = _place_randomly(grid, Cell.AGENT, occupied)
-        occupied.add(agent_pos)
-
-        while True:
-            exit_pos = _place_randomly(grid, Cell.EXIT, occupied)
-            if _manhattan(agent_pos, exit_pos) >= MIN_DISTANCE:
-                break
-            set_cell(grid, exit_pos, Cell.EMPTY)  # retry
-
-        occupied.add(exit_pos)
-
-        # Place fire sources away from agent
-        for _ in range(FIRE_SOURCES):
-            while True:
-                pos = _place_randomly(grid, Cell.FIRE, occupied)
-                if _manhattan(agent_pos, pos) >= MIN_DISTANCE // 2:
-                    occupied.add(pos)
-                    break
-                set_cell(grid, pos, Cell.EMPTY)  # retry
-
-        if _is_solvable(grid):
-            return grid, used_seed
-
-        used_seed = random.randint(0, 999_999)  # regenerate with new seed
+        grid = _try_build_level(current_seed)
+        if grid is not None and _is_solvable(grid):
+            return grid, current_seed
+        current_seed = random.randint(0, 999_999)
