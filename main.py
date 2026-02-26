@@ -31,73 +31,71 @@ def _check_status(grid: Grid, next_pos: Position | None) -> str:
     return "Running..."
 
 
-def run(seed: int | None = None) -> None:
+def _wait_for_restart(surface: pygame.Surface, font: pygame.font.Font, grid: Grid, used_seed: int, turn: int, status: str) -> None:
+    """Freezes the final frame until the player presses R."""
+    while True:
+        render_frame(surface, font, grid, used_seed, turn, status)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+                return
+
+
+def run(surface: pygame.Surface, font: pygame.font.Font, seed: int | None = None) -> None:
     grid, used_seed = generate_level(seed)
-    surface, font = init_renderer(GRID_SIZE)
-    clock = pygame.time.Clock()
     print(f"Seed: {used_seed}")
 
     turn: int = 0
     status: str = "Running..."
 
     while True:
-        # --- Event handling ---
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
-                run()  # restart with new random level
+                run(surface, font)
                 return
 
-        # --- Render current state ---
         render_frame(surface, font, grid, used_seed, turn, status)
 
-        # --- End conditions ---
         if status in ("ESCAPED!", "TRAPPED"):
-            time.sleep(2)
-            run()
+            _wait_for_restart(surface, font, grid, used_seed, turn, status)
+            run(surface, font)
             return
 
-        # --- Greedy step ---
         next_pos = greedy_next_step(grid)
 
         if next_pos is None:
             status = "TRAPPED"
             continue
 
-        # --- Check win before moving ---
         if get_cell(grid, next_pos) == Cell.EXIT:
             _apply_move(grid, next_pos)
             status = "ESCAPED!"
             continue
 
-        # --- Move agent ---
         _apply_move(grid, next_pos)
 
-        # --- Check fire collision after move ---
         agent_pos = find_position(grid, Cell.AGENT)
-        if agent_pos and any(
-            get_cell(grid, n) == Cell.FIRE
-            for n in [agent_pos]
-        ):
+        if agent_pos and get_cell(grid, agent_pos) == Cell.FIRE:
             status = "TRAPPED"
             continue
 
-        # --- Spread fire ---
         spread_fire(grid)
 
-        # --- Check if agent cell caught fire ---
         agent_pos = find_position(grid, Cell.AGENT)
         if agent_pos and get_cell(grid, agent_pos) == Cell.FIRE:
             status = "TRAPPED"
             continue
 
         turn += 1
-        clock.tick(1 / TURN_DELAY * 60)
         time.sleep(TURN_DELAY)
 
 
 if __name__ == "__main__":
     seed_arg = int(sys.argv[1]) if len(sys.argv) > 1 else None
-    run(seed_arg)
+    surface, font = init_renderer(GRID_SIZE)
+    run(surface, font, seed_arg)
