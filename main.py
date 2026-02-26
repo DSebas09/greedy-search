@@ -35,6 +35,7 @@ def run(seed: int | None = None) -> None:
     grid, used_seed = generate_level(seed)
     surface, font = init_renderer(GRID_SIZE)
     clock = pygame.time.Clock()
+    print(f"Seed: {used_seed}")
 
     turn: int = 0
     status: str = "Running..."
