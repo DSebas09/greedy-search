@@ -43,6 +43,21 @@ def _wait_for_restart(surface: pygame.Surface, font: pygame.font.Font, grid: Gri
                 return
 
 
+def _wait_for_next_turn(surface: pygame.Surface, font: pygame.font.Font, grid: Grid, used_seed: int, turn: int, status: str) -> bool:
+    """Waits for arrow key. Returns False if user wants to restart."""
+    while True:
+        render_frame(surface, font, grid, used_seed, turn, status)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RIGHT:
+                    return True   # advance one turn
+                if event.key == pygame.K_r:
+                    return False  # restart
+
+
 def run(surface: pygame.Surface, font: pygame.font.Font, seed: int | None = None) -> None:
     grid, used_seed = generate_level(seed)
     print(f"Seed: {used_seed}")
@@ -92,7 +107,9 @@ def run(surface: pygame.Surface, font: pygame.font.Font, seed: int | None = None
             continue
 
         turn += 1
-        time.sleep(TURN_DELAY)
+        if not _wait_for_next_turn(surface, font, grid, used_seed, turn, status):
+            run(surface, font)
+            return
 
 
 if __name__ == "__main__":
