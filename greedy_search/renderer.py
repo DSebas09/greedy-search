@@ -1,10 +1,11 @@
 # renderer.py
 import pygame
-from greedy_search.grid import Cell, Grid, Position
+from greedy_search.grid import Cell, Grid
 
 # --- Constants ---
 CELL_SIZE: int = 32
 HUD_HEIGHT: int = 40
+FONT_SIZE: int = 20
 
 COLORS: dict[Cell, tuple[int, int, int]] = {
     Cell.EMPTY:    (30, 30, 30),
@@ -15,14 +16,18 @@ COLORS: dict[Cell, tuple[int, int, int]] = {
     Cell.EXPLORED: (60, 60, 90),
 }
 
-FONT_SIZE: int = 20
+_HUD_BG   = (10, 10, 10)
+_HUD_FG   = (200, 200, 200)
+_GRID_LINE = (15, 15, 15)
 
 
-def compute_window_size(grid_size: int) -> tuple[int, int]:
-    """Returns (width, height) in pixels for the given grid size."""
-    width = grid_size * CELL_SIZE
-    height = grid_size * CELL_SIZE + HUD_HEIGHT
-    return width, height
+def init_renderer(grid_size: int) -> tuple[pygame.Surface, pygame.font.Font]:
+    """Initializes Pygame and returns (surface, font)."""
+    pygame.init()
+    size = (grid_size * CELL_SIZE, grid_size * CELL_SIZE + HUD_HEIGHT)
+    surface = pygame.display.set_mode(size, pygame.DOUBLEBUF)
+    pygame.display.set_caption("Escape from Burning Building")
+    return surface, pygame.font.SysFont("monospace", FONT_SIZE)
 
 
 def draw_grid(surface: pygame.Surface, grid: Grid) -> None:
@@ -31,7 +36,7 @@ def draw_grid(surface: pygame.Surface, grid: Grid) -> None:
         for c, cell in enumerate(row):
             rect = pygame.Rect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE)
             pygame.draw.rect(surface, COLORS[cell], rect)
-            pygame.draw.rect(surface, (15, 15, 15), rect, 1)  # grid line
+            pygame.draw.rect(surface, _GRID_LINE, rect, 1)
 
 
 def draw_hud(
@@ -42,22 +47,10 @@ def draw_hud(
     status: str,
 ) -> None:
     """Draws the HUD bar at the bottom with seed, turn count and status."""
-    grid_height = (len(surface.get_size()) and surface.get_height()) - HUD_HEIGHT
-    hud_rect = pygame.Rect(0, surface.get_height() - HUD_HEIGHT, surface.get_width(), HUD_HEIGHT)
-    pygame.draw.rect(surface, (10, 10, 10), hud_rect)
-
-    text = font.render(f"Seed: {seed}   Turn: {turn}   {status}", True, (200, 200, 200))
-    surface.blit(text, (10, surface.get_height() - HUD_HEIGHT + 10))
-
-
-def init_renderer(grid_size: int) -> tuple[pygame.Surface, pygame.font.Font]:
-    """Initializes Pygame and returns (surface, font)."""
-    pygame.init()
-    width, height = compute_window_size(grid_size)
-    surface = pygame.display.set_mode((width, height))
-    pygame.display.set_caption("Escape from Burning Building")
-    font = pygame.font.SysFont("monospace", FONT_SIZE)
-    return surface, font
+    hud_y = surface.get_height() - HUD_HEIGHT
+    pygame.draw.rect(surface, _HUD_BG, (0, hud_y, surface.get_width(), HUD_HEIGHT))
+    text = font.render(f"Seed: {seed}   Turn: {turn}   {status}", True, _HUD_FG)
+    surface.blit(text, (10, hud_y + 10))
 
 
 def render_frame(
