@@ -27,27 +27,26 @@ def greedy_next_step(grid: Grid) -> Position | None:
     Returns the next Position the agent should move to, or None if no path exists.
     """
     start = find_position(grid, Cell.AGENT)
-    goal = find_position(grid, Cell.EXIT)
+    goal  = find_position(grid, Cell.EXIT)
 
     if start is None or goal is None:
         return None
 
-    # (h(n), position, path)
-    heap: list[tuple[int, Position, list[Position]]] = []
-    heapq.heappush(heap, (_heuristic(grid, start, goal), start, [start]))
-    visited: set[Position] = {start}
+    came_from: dict[Position, Position | None] = {start: None}
+    heap: list[tuple[int, Position]] = [(_heuristic(grid, start, goal), start)]
 
     while heap:
-        _, current, path = heapq.heappop(heap)
+        _, current = heapq.heappop(heap)
 
         if current == goal:
-            return path[1] if len(path) > 1 else None
+            # Walk back to find the first step after start
+            while came_from[current] != start:
+                current = came_from[current]
+            return current
 
         for neighbor in get_neighbors(grid, current):
-            cell = get_cell(grid, neighbor)
-            if neighbor not in visited and is_passable(cell):
-                visited.add(neighbor)
-                h = _heuristic(grid, neighbor, goal)
-                heapq.heappush(heap, (h, neighbor, path + [neighbor]))
+            if neighbor not in came_from and is_passable(get_cell(grid, neighbor)):
+                came_from[neighbor] = current
+                heapq.heappush(heap, (_heuristic(grid, neighbor, goal), neighbor))
 
     return None  # No path found — agent is trapped
